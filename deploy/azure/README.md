@@ -106,3 +106,9 @@ already present in the container's system trust store.
 Container Apps terminates TLS for its managed public hostname. Use an internal
 environment plus Application Gateway or Front Door when organizational policy
 requires private ingress, WAF, or centralized custom-domain TLS.
+
+To expose remote MCP for Microsoft Agent Framework or Azure SRE Agent, set
+`mcpHttpEnabled = true` and set `mcpHttpPublicHostname` to the exact public DNS
+hostname. The template constructs the HTTPS origin and rejects schemes, ports,
+paths, queries, and credentials. Keep `mcpHttpWriteEnabled = false` for
+investigation-only connectors.

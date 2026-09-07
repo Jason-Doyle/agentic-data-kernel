@@ -178,6 +178,7 @@ Production routes, through the TLS proxy:
 | `GET /metrics` | No | Prometheus text metrics |
 | `GET /v1/catalog` | Yes | Production capabilities |
 | `POST /v1/execute` | Yes | One scoped Agent Intent operation |
+| `POST /mcp` | Yes | Optional stateless Streamable HTTP MCP |
 
 There is no production SQL route.
 
@@ -199,6 +200,56 @@ npm run prod:mcp
 The MCP process authenticates at startup, binds every tool to that identity,
 and revalidates revocation, expiry, tenant status, scope, and purpose for every
 operation. It does not accept caller-supplied tenant or principal identities.
+
+### Remote Streamable HTTP MCP
+
+The production HTTP service can expose a stateless MCP endpoint at:
+
+```text
+POST /mcp
+```
+
+It is disabled by default. Enable it only behind the same trusted HTTPS edge as
+the production API:
+
+```text
+MCP_HTTP_ENABLED=true
+MCP_HTTP_PUBLIC_ORIGIN=https://agent-data.example.com
+MCP_HTTP_WRITE_ENABLED=false
+```
+
+Clients must send on every request:
+
+```text
+Authorization: Bearer <ADK API key>
+X-Agent-Purpose: <approved-purpose>
+```
+
+The public origin must contain only the exact public scheme, hostname, and
+optional port. Remote MCP validates the `Host` header and any supplied
+`Origin` header before authenticating. Reverse proxies must preserve the
+original public `Host`.
+
+Remote MCP is stateless and uses JSON responses rather than a long-lived SSE
+session. Authentication, revocation, expiry, tenant state, purpose, and scope
+are checked for every request and operation. JSON-RPC batches are rejected so
+one HTTP request cannot multiply work behind one rate-limit charge.
+
+With `MCP_HTTP_WRITE_ENABLED=false`, the endpoint advertises only:
+
+```text
+search_knowledge
+resolve_claims
+get_machine
+list_effects
+explain_trace
+```
+
+Setting it to `true` additionally advertises `execute_operation`. Use a
+separate, narrowly scoped key and an external review or approval boundary
+before exposing write or effect operations.
+
+`GET /mcp` and `DELETE /mcp` are not supported in stateless JSON-response mode.
 
 ## Encrypted artifacts
 

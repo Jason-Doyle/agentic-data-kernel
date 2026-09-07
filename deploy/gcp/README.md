@@ -57,3 +57,7 @@ API and worker rollout.
 When `ingress_enabled` is true, `ingress_tls_secret_name` is required. For the
 GCE ingress controller, also set `kubernetes.io/ingress.allow-http` to
 `"false"`.
+
+Remote MCP shares the HTTPS ingress at `/mcp`. Set `mcp_http_enabled = true`
+and `mcp_http_public_origin` to the exact external origin. The module keeps
+`mcp_http_write_enabled` false by default.

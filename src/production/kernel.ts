@@ -570,6 +570,29 @@ export class ProductionKernel {
     );
   }
 
+  public async listEffectsReadOnly(
+    principal: AuthenticatedPrincipal,
+    operation: Extract<AgentOperation, { op: "list_effects" }> = {
+      op: "list_effects",
+    },
+  ): Promise<EffectRecord[]> {
+    return this.database.withTenantTransaction(
+      principal,
+      async (client) => {
+        const active = await revalidateAuthenticatedPrincipal(
+          client,
+          principal,
+        );
+        requireScope(active, "data:read");
+        return this.listEffects(
+          client,
+          active.tenantId,
+          operation,
+        );
+      },
+    );
+  }
+
   private async prepareArtifact(
     principal: AuthenticatedPrincipal,
     operation: Extract<AgentOperation, { op: "put_artifact" }>,

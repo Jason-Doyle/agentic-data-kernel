@@ -13,6 +13,9 @@
 # embedding_base_url      = "https://api.openai.com/v1"
 # artifact_current_key_id = "v1"
 # effect_allowed_hosts    = "payments.example.com,deployments.example.com"
+# mcp_http_enabled        = true
+# mcp_http_public_origin  = "https://agent-data.example.com"
+# mcp_http_write_enabled  = false
 # services_enabled        = false
 #
 # secret_arns = {

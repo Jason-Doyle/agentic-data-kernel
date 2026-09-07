@@ -269,6 +269,12 @@ use the remote HTTP adapter. Direct MCP remains available when the model host
 already owns context assembly and turn lifecycle. See
 [Agent Middleware](docs/AGENT_MIDDLEWARE.md).
 
+Runnable integrations are included for
+[Microsoft Agent Framework](examples/microsoft-agent-framework) and
+[Azure SRE Agent](examples/azure-sre-agent). The former demonstrates local
+stdio and production Streamable HTTP MCP. The latter configures ADK as a
+durable incident-context connector and custom SRE specialist.
+
 ## When it fits
 
 Use Agentic Data Kernel when several of these are true:
@@ -303,7 +309,7 @@ Package entry points and commands:
 | PostgreSQL TypeScript | `agentic-data-kernel/production` |
 | Embedded CLI | `agentic-data` or `agentic-data-kernel` |
 | Production CLI | `agentic-data-prod` |
-| MCP | `agentic-data-kernel mcp` or `agentic-data-prod mcp` |
+| MCP | `agentic-data-kernel mcp`, `agentic-data-prod mcp`, or production `POST /mcp` |
 | HTTP | `POST /v1/execute` |
 
 Source checkout:

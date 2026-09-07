@@ -5,6 +5,7 @@ import * as z from "zod/v4";
 import type { AgenticKernel } from "./kernel.js";
 import {
   executeIntent,
+  intentEnvelopeSchema,
   lineageEndpointSchema,
   type AgentOperation,
 } from "./ir.js";
@@ -51,7 +52,7 @@ export function createMcpServer(kernel: AgenticKernel): McpServer {
       description:
         "Validate and execute one Agent Intent operation with an execution receipt.",
       inputSchema: {
-        envelope: z.unknown(),
+        envelope: intentEnvelopeSchema,
       },
     },
     async ({ envelope }) => toolResult(executeIntent(kernel, envelope)),

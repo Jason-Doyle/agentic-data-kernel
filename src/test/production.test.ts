@@ -15,9 +15,10 @@ import type { AddressInfo } from "node:net";
 import type { PeerCertificate } from "node:tls";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client as PgClient } from "pg";
 import { toSql as vectorToSql } from "pgvector";
@@ -441,6 +442,57 @@ test("effect leases outlive transport timeouts", () => {
       }).effectLeaseSeconds,
       20,
     );
+  });
+
+  test("remote MCP requires an explicit secure public origin", () => {
+    const environment = {
+      DATABASE_URL:
+        "postgresql://example:password@database.example/test",
+      DATABASE_SSL: "disable",
+      AUTH_PEPPER: "a".repeat(32),
+      ARTIFACT_KEYRING: JSON.stringify({
+        v1: Buffer.alloc(32, 1).toString("base64"),
+      }),
+      ARTIFACT_CURRENT_KEY_ID: "v1",
+      EMBEDDING_BASE_URL: "https://embeddings.example.com/v1",
+      EMBEDDING_API_KEY: "test-key",
+    };
+    assert.throws(
+      () =>
+        loadProductionConfig({
+          ...environment,
+          MCP_HTTP_ENABLED: "true",
+        }),
+      /MCP_HTTP_PUBLIC_ORIGIN is required/,
+    );
+    assert.throws(
+      () =>
+        loadProductionConfig({
+          ...environment,
+          MCP_HTTP_ENABLED: "true",
+          MCP_HTTP_PUBLIC_ORIGIN: "http://agent-data.example.com",
+        }),
+      /must use HTTPS/,
+    );
+    assert.throws(
+      () =>
+        loadProductionConfig({
+          ...environment,
+          MCP_HTTP_WRITE_ENABLED: "true",
+        }),
+      /requires MCP_HTTP_ENABLED/,
+    );
+    const config = loadProductionConfig({
+      ...environment,
+      MCP_HTTP_ENABLED: "true",
+      MCP_HTTP_PUBLIC_ORIGIN: "http://127.0.0.1:4318",
+    });
+    assert.equal(config.mcpHttpEnabled, true);
+    assert.equal(
+      config.mcpHttpPublicOrigin,
+      "http://127.0.0.1:4318",
+    );
+    assert.equal(config.mcpHttpWriteEnabled, false);
   });
 
   test("metrics render Prometheus histograms and gauges", () => {
@@ -2334,6 +2386,15 @@ test(
       );
 
       await testAuthenticatedHttp(config, database, kernel, metrics, logger, keyA.token, principalA);
+      await testProductionRemoteMcp(
+        config,
+        database,
+        kernel,
+        metrics,
+        logger,
+        keyA.token,
+        principalA,
+      );
       await testProductionMcp(database, kernel, principalA);
     } finally {
       await cleanupTenant(database, principalA);
@@ -3830,6 +3891,8 @@ function testConfig(
     shutdownTimeoutMs: 10_000,
     workerMonitorHost: "127.0.0.1",
     workerMonitorPort: 4319,
+    mcpHttpEnabled: false,
+    mcpHttpWriteEnabled: false,
   };
 }
 
@@ -3974,6 +4037,40 @@ async function withTimeout<T>(
   }
 }
 
+function postMcpWithHost(
+  endpoint: URL,
+  host: string,
+  body: JsonValue,
+  token: string,
+  purpose: string,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const request = httpRequest(
+      {
+        hostname: endpoint.hostname,
+        port: endpoint.port,
+        path: endpoint.pathname,
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          authorization: ["Bearer", token].join(" "),
+          "content-length": Buffer.byteLength(payload),
+          "content-type": "application/json",
+          host,
+          "x-agent-purpose": purpose,
+        },
+      },
+      (response) => {
+        response.resume();
+        response.once("end", () => resolve(response.statusCode ?? 0));
+      },
+    );
+    request.once("error", reject);
+    request.end(payload);
+  });
+}
+
 function listFiles(directory: string): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(directory, {
@@ -4098,6 +4195,79 @@ async function testProductionMcp(
   kernel: ProductionKernel,
   principal: AuthenticatedPrincipal,
 ): Promise<void> {
+  const timestamp = "2026-01-01T00:00:00.000Z";
+  await database.withTenantTransaction(principal, async (dbClient) => {
+    await dbClient.query(
+      `INSERT INTO agentic.machine_instances (
+         tenant_id, instance_id, machine_type, state, data_json, revision,
+         terminal, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
+      [
+        principal.tenantId,
+        "order:mcp-pagination",
+        "retail_order",
+        "payment_pending",
+        {},
+        1,
+        false,
+        timestamp,
+      ],
+    );
+    await dbClient.query(
+      `INSERT INTO agentic.machine_history (
+         tenant_id, instance_id, revision, event_id, transition_name,
+         prior_state, new_state, data_json, created_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        principal.tenantId,
+        "order:mcp-pagination",
+        1,
+        "event:mcp-pagination",
+        "create",
+        "none",
+        "ready",
+        {},
+        timestamp,
+      ],
+    );
+    for (let index = 0; index < 101; index += 1) {
+      const suffix = String(index).padStart(3, "0");
+      await dbClient.query(
+        `INSERT INTO agentic.effect_intents (
+           tenant_id, effect_id, instance_id, originating_revision,
+           effect_name, effect_type, outcome_handler, target_url, status_url,
+           request_json, idempotency_key, authorizing_key_id, purpose,
+           budget_amount, currency, status, attempt_count, provider_namespace,
+           request_hash, created_at, updated_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+           $15, $16, $17, $18, $19, $20, $20
+         )`,
+        [
+          principal.tenantId,
+          `effect:mcp:${suffix}`,
+          "order:mcp-pagination",
+          1,
+          `effect_${suffix}`,
+          "test.effect",
+          "retail_order_payment",
+          "https://payments.example.com/apply",
+          "https://payments.example.com/status",
+          {},
+          `mcp-effect-key-${suffix}`,
+          principal.keyId,
+          principal.purpose,
+          0,
+          "USD",
+          "planned",
+          0,
+          "https://payments.example.com",
+          `mcp-request-hash-${suffix}`,
+          timestamp,
+        ],
+      );
+    }
+  });
   const server = createProductionMcpServer(kernel, principal);
   const client = new Client({
     name: "production-mcp-test",
@@ -4111,6 +4281,7 @@ async function testProductionMcp(
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "execute_operation"));
     assert.ok(tools.tools.some((tool) => tool.name === "explain_trace"));
+    assert.ok(tools.tools.some((tool) => tool.name === "list_effects"));
     assert.ok(
       !tools.tools.some((tool) => tool.name === "record_payment_outcome"),
     );
@@ -4119,6 +4290,16 @@ async function testProductionMcp(
       arguments: { instanceId: "order:order-1" },
     });
     assert.ok(Array.isArray(result.content));
+    const boundedEffects = await client.callTool({
+      name: "list_effects",
+      arguments: { instanceId: "order:mcp-pagination" },
+    });
+    assert.ok(Array.isArray(boundedEffects.content));
+    const effectContent = boundedEffects.content[0];
+    assert.ok(effectContent && effectContent.type === "text");
+    const effects = JSON.parse(effectContent.text) as unknown;
+    assert.ok(Array.isArray(effects));
+    assert.equal(effects.length, 100);
     await database.withTenantWriteTransaction(principal, (dbClient) =>
       revokeApiKey(dbClient, principal.keyId),
     );
@@ -4134,5 +4315,199 @@ async function testProductionMcp(
   } finally {
     await client.close();
     await server.close();
+  }
+}
+
+async function testProductionRemoteMcp(
+    config: ProductionConfig,
+    database: ProductionDatabase,
+    kernel: ProductionKernel,
+    metrics: MetricsRegistry,
+    logger: ReturnType<typeof createLogger>,
+    token: string,
+    principal: AuthenticatedPrincipal,
+  ): Promise<void> {
+    const port = await reservePort();
+    const server = await startProductionHttpServer({
+      config: {
+        ...config,
+        port,
+        mcpHttpEnabled: true,
+        mcpHttpPublicOrigin: `http://127.0.0.1:${port}`,
+        mcpHttpWriteEnabled: false,
+      },
+      database,
+      kernel,
+      metrics,
+      logger,
+    });
+    const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
+    const client = new Client({
+      name: "production-remote-mcp-test",
+      version: "1.2.0",
+    });
+    const transport = new StreamableHTTPClientTransport(endpoint, {
+      requestInit: {
+        headers: {
+          authorization: ["Bearer", token].join(" "),
+          "x-agent-purpose": principal.purpose,
+        },
+      },
+    });
+    try {
+      await client.connect(transport);
+      const tools = await client.listTools();
+      assert.ok(
+        tools.tools.some((tool) => tool.name === "search_knowledge"),
+      );
+      assert.ok(
+        tools.tools.some((tool) => tool.name === "list_effects"),
+      );
+      assert.ok(
+        !tools.tools.some((tool) => tool.name === "execute_operation"),
+      );
+      const batch = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          authorization: ["Bearer", token].join(" "),
+          "content-type": "application/json",
+          "mcp-protocol-version": "2025-11-25",
+          "x-agent-purpose": principal.purpose,
+        },
+        body: JSON.stringify([
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/list",
+            params: {},
+          },
+          {
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/list",
+            params: {},
+          },
+        ]),
+      });
+      assert.equal(batch.status, 400);
+      assert.match(await batch.text(), /batches are not supported/);
+      const machine = await client.callTool({
+        name: "get_machine",
+        arguments: { instanceId: "order:order-1" },
+      });
+      assert.match(JSON.stringify(machine.content), /order:order-1/);
+      for (const method of ["GET", "DELETE"] as const) {
+        const unsupported = await fetch(endpoint, {
+          method,
+          headers: {
+            accept: "application/json, text/event-stream",
+            authorization: ["Bearer", token].join(" "),
+            "x-agent-purpose": principal.purpose,
+          },
+        });
+        assert.equal(unsupported.status, 405);
+      }
+
+      const missingAuth = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          host: `127.0.0.1:${port}`,
+          "x-agent-purpose": principal.purpose,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "missing-auth", version: "1" },
+          },
+        }),
+      });
+      assert.equal(missingAuth.status, 401);
+
+      const badOrigin = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          authorization: ["Bearer", token].join(" "),
+          "content-type": "application/json",
+          host: `127.0.0.1:${port}`,
+          origin: "https://attacker.example",
+          "x-agent-purpose": principal.purpose,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "bad-origin", version: "1" },
+          },
+        }),
+      });
+      assert.equal(badOrigin.status, 403);
+
+      const badHostStatus = await postMcpWithHost(
+        endpoint,
+        "attacker.example",
+        {
+          jsonrpc: "2.0",
+          id: 3,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "bad-host", version: "1" },
+          },
+        },
+        token,
+        principal.purpose,
+      );
+      assert.equal(badHostStatus, 403);
+
+      const revocableKey = await createApiKey(database, config, {
+        tenantId: principal.tenantId,
+        tenantName: "Tenant A",
+        principalId: "remote-mcp-revocable",
+        scopes: ["data:read"],
+        purposes: [principal.purpose],
+        effectBudgetCurrency: "USD",
+        effectBudgetLimit: "0",
+      });
+      const revocableClient = new Client({
+        name: "production-remote-mcp-revocation-test",
+        version: "1.2.0",
+      });
+      const revocableTransport = new StreamableHTTPClientTransport(
+        endpoint,
+        {
+          requestInit: {
+            headers: {
+              authorization: ["Bearer", revocableKey.token].join(" "),
+              "x-agent-purpose": principal.purpose,
+            },
+          },
+        },
+      );
+      try {
+        await revocableClient.connect(revocableTransport);
+        await revocableClient.listTools();
+        await database.withSystemWriteTransaction((dbClient) =>
+          revokeApiKey(dbClient, revocableKey.keyId),
+        );
+        await assert.rejects(
+          () => revocableClient.listTools(),
+          /401|Unauthorized|revoked/i,
+        );
+      } finally {
+        await revocableClient.close();
+      }
+    } finally {
+      await client.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }

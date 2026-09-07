@@ -17,7 +17,10 @@ locals {
     { name = "TRUSTED_PROXY_HOPS", value = "1" },
     { name = "WORKER_MONITOR_HOST", value = "0.0.0.0" },
     { name = "WORKER_MONITOR_PORT", value = "4319" },
-    { name = "SHUTDOWN_TIMEOUT_MS", value = "10000" }
+    { name = "SHUTDOWN_TIMEOUT_MS", value = "10000" },
+    { name = "MCP_HTTP_ENABLED", value = tostring(var.mcp_http_enabled) },
+    { name = "MCP_HTTP_PUBLIC_ORIGIN", value = var.mcp_http_public_origin },
+    { name = "MCP_HTTP_WRITE_ENABLED", value = tostring(var.mcp_http_write_enabled) }
   ]
   runtime_secrets = [
     { name = "DATABASE_URL", valueFrom = var.secret_arns.database_url },

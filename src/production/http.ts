@@ -22,6 +22,10 @@ import type { ProductionKernel } from "./kernel.js";
 import type { MetricsRegistry } from "./metrics.js";
 import { embeddingSpaceStatus } from "./embedding-space.js";
 import { assertRuntimeRoleSafe } from "./bootstrap.js";
+import {
+  assertProductionMcpHttpRequestAllowed,
+  handleProductionMcpHttpRequest,
+} from "./mcp-http.js";
 
 export interface ProductionHttpDependencies {
   config: ProductionConfig;
@@ -127,6 +131,19 @@ export async function startProductionHttpServer({
         });
         return;
       }
+      const remoteMcpRequest =
+        config.mcpHttpEnabled === true && url.pathname === "/mcp";
+      if (remoteMcpRequest) {
+        if (!config.mcpHttpPublicOrigin) {
+          throw new Error(
+            "Remote MCP is enabled without a public origin",
+          );
+        }
+        assertProductionMcpHttpRequestAllowed(
+          request,
+          config.mcpHttpPublicOrigin,
+        );
+      }
 
       const principal = await authenticateRequest(
         request,
@@ -139,6 +156,46 @@ export async function startProductionHttpServer({
           error: { code: "rate_limited", message: "Rate limit exceeded" },
           requestId,
           },
+        );
+        return;
+      }
+
+      if (remoteMcpRequest) {
+        if (request.method !== "POST") {
+          response.setHeader("allow", "POST");
+          sendJson(response, 405, {
+            jsonrpc: "2.0",
+            error: {
+              code: -32_000,
+              message: "Method not allowed.",
+            },
+            id: null,
+          });
+          return;
+        }
+        if (request.method === "POST") {
+          requireJsonContentType(request);
+        }
+        const body = await readJsonBody(request, config.maxBodyBytes);
+        if (Array.isArray(body)) {
+          sendJson(response, 400, {
+            jsonrpc: "2.0",
+            error: {
+              code: -32_600,
+              message: "JSON-RPC batches are not supported.",
+            },
+            id: null,
+          });
+          return;
+        }
+        await handleProductionMcpHttpRequest(
+          request,
+          response,
+          body,
+          kernel,
+          principal,
+          config.mcpHttpWriteEnabled === true,
+          logger,
         );
         return;
       }

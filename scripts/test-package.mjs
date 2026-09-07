@@ -41,6 +41,8 @@ try {
     "dist/production/index.d.ts",
     "dist/production/agent.js",
     "dist/production/agent.d.ts",
+    "dist/production/mcp-http.js",
+    "dist/production/mcp-http.d.ts",
     "dist/production/bootstrap.js",
     "dist/production/bootstrap.d.ts",
     "dist/examples/sre-scenario.js",
@@ -59,6 +61,13 @@ try {
     "scripts/validate-deployments.ps1",
     "scripts/backup-common.ps1",
     "docs/AGENT_MIDDLEWARE.md",
+    "examples/microsoft-agent-framework/README.md",
+    "examples/microsoft-agent-framework/local_stdio.py",
+    "examples/microsoft-agent-framework/remote_http.py",
+    "examples/microsoft-agent-framework/requirements.txt",
+    "examples/microsoft-agent-framework/validation-requirements.txt",
+    "examples/azure-sre-agent/README.md",
+    "examples/azure-sre-agent/durable-incident-agent.yaml",
     "README.md",
     "LICENSE",
   ]) {
@@ -78,6 +87,13 @@ try {
   }
   if ([...packagedPaths].some((path) => path.startsWith("dist/test/"))) {
     throw new Error("Package unexpectedly contains compiled tests");
+  }
+  if (
+    [...packagedPaths].some(
+      (path) => path.includes("__pycache__") || path.endsWith(".pyc"),
+    )
+  ) {
+    throw new Error("Package unexpectedly contains Python bytecode");
   }
 
   installDirectory = mkdtempSync(join(tmpdir(), "agentic-data-package-"));
@@ -219,6 +235,7 @@ try {
     } from "agentic-data-kernel";
 import {
   type ProductionHttpAgentMiddlewareConfig,
+  type ProductionConfig,
   bootstrapRuntimeRole,
   type EmbeddingSpace,
   ProductionDatabase,
@@ -244,6 +261,14 @@ const middlewareConfig: AgentDataMiddlewareConfig | null = null;
 const contextBundle: AgentContextBundle | null = null;
 const agentSession: AgentDataSession | null = null;
 const httpMiddlewareConfig: ProductionHttpAgentMiddlewareConfig | null = null;
+type LegacyProductionConfig = Omit<
+  ProductionConfig,
+  "mcpHttpEnabled" | "mcpHttpPublicOrigin" | "mcpHttpWriteEnabled"
+>;
+type LegacyProductionConfigIsCompatible =
+  LegacyProductionConfig extends ProductionConfig ? true : never;
+const legacyProductionConfigIsCompatible: LegacyProductionConfigIsCompatible =
+  true;
 void kernel;
 void knowledgeLayer;
 void knowledgeOperation;
@@ -258,6 +283,7 @@ void middlewareConfig;
 void contextBundle;
 void agentSession;
 void httpMiddlewareConfig;
+void legacyProductionConfigIsCompatible;
 store.close();
 `,
   );

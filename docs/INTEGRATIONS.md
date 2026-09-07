@@ -1,7 +1,8 @@
 # Integrations
 
 The repository includes runnable examples for the library, HTTP API, MCP,
-embedding providers, effect receivers, and the retail workflow.
+Microsoft Agent Framework, Azure SRE Agent, embedding providers, effect
+receivers, and the retail workflow.
 
 ## Install
 
@@ -22,6 +23,8 @@ Pin an exact version in applications and production deployments.
 | MCP client | `examples/integrations/mcp-client.ts` | `npm run example:mcp` |
 | Authenticated production HTTP | `examples/integrations/production-http.ts` | `npm run example:production-http` |
 | Production HTTP agent middleware | `examples/integrations/production-agent-middleware.ts` | `npm run example:production-agent` |
+| Microsoft Agent Framework | `examples/microsoft-agent-framework` | Python, stdio or Streamable HTTP MCP |
+| Azure SRE Agent | `examples/azure-sre-agent` | Remote MCP connector and custom agent |
 | Production retail workflow | `examples/integrations/production-retail.ts` | `npm run example:production-retail` |
 | Flagship SRE scenario | `examples/integrations/sre-scenario.ts` | `npm run example:sre` |
 | Embedding provider | `examples/integrations/embedding-provider.ts` | `npm run example:embedding` |
@@ -136,6 +139,22 @@ npm run example:mcp
 Use `npm run prod:mcp` when the client needs authenticated PostgreSQL-backed
 state. The production MCP process binds one API key and purpose at startup, so
 tools do not accept caller-supplied tenant or principal identities.
+
+Production HTTP can also expose stateless Streamable HTTP MCP at `/mcp`.
+Remote MCP is disabled and read-only by default. See
+[Production Profile](PRODUCTION.md#remote-streamable-http-mcp).
+
+## Microsoft agent integrations
+
+- [Microsoft Agent Framework](../examples/microsoft-agent-framework) includes
+  Python examples for local stdio MCP and authenticated production Streamable
+  HTTP MCP.
+- [Azure SRE Agent](../examples/azure-sre-agent) includes connector setup,
+  selected read-only tools, a custom incident-context agent, and an optional
+  reviewed write mode.
+
+These are community integration examples rather than Microsoft-supported
+product integrations.
 
 ## Authenticated production HTTP
 

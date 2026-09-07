@@ -43,6 +43,9 @@ config:
   workerMonitorHost: 0.0.0.0
   workerMonitorPort: "4319"
   shutdownTimeoutMs: "10000"
+  mcpHttpEnabled: "false"
+  mcpHttpPublicOrigin: ""
+  mcpHttpWriteEnabled: "false"
 
 api:
   replicaCount: 1

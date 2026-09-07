@@ -1,4 +1,5 @@
 import * as z from "zod/v4";
+import { isIP } from "node:net";
 import {
   DEFAULT_EMBEDDING_DIMENSIONS,
   DEFAULT_EMBEDDING_MODEL,
@@ -13,6 +14,13 @@ const optionalEnvironmentValue = z.preprocess(
       ? undefined
       : value,
   z.string().min(1).optional(),
+);
+const optionalUrlEnvironmentValue = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === ""
+      ? undefined
+      : value,
+  z.string().url().optional(),
 );
 
 const baseSchema = z.object({
@@ -120,6 +128,9 @@ const serverObjectSchema = baseSchema.extend({
     .min(1)
     .max(65_535)
     .default(4319),
+  MCP_HTTP_ENABLED: z.stringbool().default(false),
+  MCP_HTTP_PUBLIC_ORIGIN: optionalUrlEnvironmentValue,
+  MCP_HTTP_WRITE_ENABLED: z.stringbool().default(false),
 });
 const serverSchema = serverObjectSchema.superRefine((value, context) => {
   if (
@@ -132,6 +143,50 @@ const serverSchema = serverObjectSchema.superRefine((value, context) => {
       message:
         "EFFECT_LEASE_SECONDS must exceed EFFECT_TIMEOUT_MS by at least 5 seconds",
     });
+  }
+  if (value.MCP_HTTP_ENABLED && !value.MCP_HTTP_PUBLIC_ORIGIN) {
+    context.addIssue({
+      code: "custom",
+      path: ["MCP_HTTP_PUBLIC_ORIGIN"],
+      message:
+        "MCP_HTTP_PUBLIC_ORIGIN is required when MCP_HTTP_ENABLED is true",
+    });
+  }
+  if (!value.MCP_HTTP_ENABLED && value.MCP_HTTP_WRITE_ENABLED) {
+    context.addIssue({
+      code: "custom",
+      path: ["MCP_HTTP_WRITE_ENABLED"],
+      message:
+        "MCP_HTTP_WRITE_ENABLED requires MCP_HTTP_ENABLED",
+    });
+  }
+  if (value.MCP_HTTP_PUBLIC_ORIGIN) {
+    const origin = new URL(value.MCP_HTTP_PUBLIC_ORIGIN);
+    if (
+      origin.username ||
+      origin.password ||
+      origin.search ||
+      origin.hash ||
+      (origin.pathname !== "" && origin.pathname !== "/")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["MCP_HTTP_PUBLIC_ORIGIN"],
+        message:
+          "MCP_HTTP_PUBLIC_ORIGIN must contain only scheme, host, and optional port",
+      });
+    }
+    if (
+      origin.protocol !== "https:" &&
+      !(origin.protocol === "http:" && isLoopbackHost(origin.hostname))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["MCP_HTTP_PUBLIC_ORIGIN"],
+        message:
+          "MCP_HTTP_PUBLIC_ORIGIN must use HTTPS except for loopback development",
+      });
+    }
   }
 });
 
@@ -181,6 +236,9 @@ export interface ProductionConfig extends DatabaseConfig {
   shutdownTimeoutMs: number;
   workerMonitorHost: string;
   workerMonitorPort: number;
+  mcpHttpEnabled?: boolean;
+  mcpHttpPublicOrigin?: string;
+  mcpHttpWriteEnabled?: boolean;
 }
 
 export function loadDatabaseConfig(
@@ -276,7 +334,29 @@ export function loadProductionConfig(
     shutdownTimeoutMs: parsed.SHUTDOWN_TIMEOUT_MS,
     workerMonitorHost: parsed.WORKER_MONITOR_HOST,
     workerMonitorPort: parsed.WORKER_MONITOR_PORT,
+    mcpHttpEnabled: parsed.MCP_HTTP_ENABLED,
+    ...(parsed.MCP_HTTP_PUBLIC_ORIGIN
+      ? {
+          mcpHttpPublicOrigin: new URL(
+            parsed.MCP_HTTP_PUBLIC_ORIGIN,
+          ).origin,
+        }
+      : {}),
+    mcpHttpWriteEnabled: parsed.MCP_HTTP_WRITE_ENABLED,
   };
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  const normalized = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  if (normalized === "localhost" || normalized === "::1") {
+    return true;
+  }
+  return (
+    isIP(normalized) === 4 &&
+    normalized.split(".")[0] === "127"
+  );
 }
 
 function parseDatabaseCaCertificate(

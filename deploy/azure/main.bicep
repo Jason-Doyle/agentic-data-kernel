@@ -58,6 +58,39 @@ param embeddingDimensions int = 1536
 @description('Comma-separated HTTPS hosts allowed for external effects.')
 param effectAllowedHosts string = ''
 
+@description('Expose authenticated Streamable HTTP MCP at /mcp.')
+param mcpHttpEnabled bool = false
+
+@description('Exact public DNS hostname used to construct the remote MCP HTTPS origin.')
+param mcpHttpPublicHostname string = ''
+
+@description('Expose execute_operation through remote MCP. Keep false for read-only agents.')
+param mcpHttpWriteEnabled bool = false
+
+var mcpHttpHostnameLabels = split(mcpHttpPublicHostname, '.')
+var invalidMcpHttpHostnameLabels = filter(
+  mcpHttpHostnameLabels,
+  label => empty(label) || length(label) > 63 || startsWith(label, '-') || endsWith(label, '-')
+)
+var invalidMcpHttpHostnameCharacters = filter(
+  range(0, length(mcpHttpPublicHostname)),
+  index => !contains('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.', substring(mcpHttpPublicHostname, index, 1))
+)
+var validatedMcpHttpPublicHostname = empty(mcpHttpPublicHostname)
+  ? ''
+  : length(mcpHttpPublicHostname) > 253 || length(invalidMcpHttpHostnameLabels) > 0 || length(invalidMcpHttpHostnameCharacters) > 0
+    ? fail('mcpHttpPublicHostname must be a valid DNS hostname without a scheme, port, path, query, or credentials')
+    : mcpHttpPublicHostname
+var validatedMcpHttpPublicOrigin = empty(validatedMcpHttpPublicHostname)
+  ? ''
+  : 'https://${validatedMcpHttpPublicHostname}'
+var validatedMcpHttpEnabled = mcpHttpEnabled && empty(validatedMcpHttpPublicHostname)
+  ? fail('mcpHttpPublicHostname is required when mcpHttpEnabled is true')
+  : mcpHttpEnabled
+var validatedMcpHttpWriteEnabled = mcpHttpWriteEnabled && !validatedMcpHttpEnabled
+  ? fail('mcpHttpWriteEnabled requires mcpHttpEnabled')
+  : mcpHttpWriteEnabled
+
 @description('Start the API and worker after bootstrap and migration jobs succeed.')
 param startWorkloads bool = false
 
@@ -191,6 +224,18 @@ var runtimeEnvironment = concat([
   {
     name: 'SHUTDOWN_TIMEOUT_MS'
     value: '10000'
+  }
+  {
+    name: 'MCP_HTTP_ENABLED'
+    value: string(validatedMcpHttpEnabled)
+  }
+  {
+    name: 'MCP_HTTP_PUBLIC_ORIGIN'
+    value: validatedMcpHttpPublicOrigin
+  }
+  {
+    name: 'MCP_HTTP_WRITE_ENABLED'
+    value: string(validatedMcpHttpWriteEnabled)
   }
 ], databaseCaEnvironment)
 

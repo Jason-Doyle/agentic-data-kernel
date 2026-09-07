@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added authenticated, read-only-by-default Streamable HTTP MCP for remote
+  agent hosts, with exact public-origin validation and per-request identity
+  checks.
+- Added validated Microsoft Agent Framework and Azure SRE Agent integration
+  examples.
+
 ## 1.1.0
 
 - Added framework-neutral agent middleware with bounded context compilation,

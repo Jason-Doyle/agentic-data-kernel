@@ -49,6 +49,10 @@ issue.
 - Do not grant `effects:reconcile` to ordinary API clients.
 - Restrict `/metrics` and health endpoints at the network layer when operational
   metadata is considered sensitive.
+- Keep remote MCP disabled unless needed. When enabled, configure its exact
+  public HTTPS origin, preserve the public Host header at the proxy, and keep
+  write tools disabled unless a narrowly scoped identity and approval boundary
+  are in place.
 - Back up the PostgreSQL database and encrypted artifact directory together.
 - Sign backup manifests with `BACKUP_MANIFEST_KEY` stored outside the backup
   location.
