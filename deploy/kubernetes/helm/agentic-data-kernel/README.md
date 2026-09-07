@@ -44,7 +44,7 @@ Install:
 helm upgrade --install agentic-data `
   .\deploy\kubernetes\helm\agentic-data-kernel `
   --namespace agentic-data `
-  --set image.tag="1.1.0" `
+  --set image.tag="1.2.0" `
   --set config.embeddingBaseUrl="https://api.openai.com/v1" `
   --set config.effectAllowedHosts="payments.example.com"
 ```

@@ -3,7 +3,7 @@ using './main.bicep'
 // Copy this file, then uncomment and replace every example before deployment.
 // param location = 'eastus2'
 // param namePrefix = 'agentic-data'
-// param image = 'ghcr.io/jason-doyle/agentic-data-kernel:1.1.0'
+// param image = 'ghcr.io/jason-doyle/agentic-data-kernel:1.2.0'
 // param managedEnvironmentId = '/subscriptions/.../managedEnvironments/...'
 // param artifactStorageName = 'artifact-store'
 // param runtimeIdentityResourceId = '/subscriptions/.../userAssignedIdentities/...'

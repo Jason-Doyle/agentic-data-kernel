@@ -1,6 +1,6 @@
 {
   "name": "agentic-data-kernel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Temporal knowledge and durable workflow infrastructure for software agents",
   "keywords": [
     "agents",
