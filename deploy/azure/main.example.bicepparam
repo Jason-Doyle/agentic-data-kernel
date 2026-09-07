@@ -18,4 +18,7 @@ using './main.bicep'
 // param embeddingBaseUrl = 'https://api.openai.com/v1'
 // param artifactCurrentKeyId = 'v1'
 // param effectAllowedHosts = 'payments.example.com,deployments.example.com'
+// param mcpHttpEnabled = true
+// param mcpHttpPublicHostname = 'agent-data.example.com'
+// param mcpHttpWriteEnabled = false
 // param startWorkloads = false

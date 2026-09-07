@@ -59,6 +59,9 @@ locals {
       embeddingDimensions  = tostring(var.embedding_dimensions)
       effectAllowedHosts   = var.effect_allowed_hosts
       trustedProxyHops     = "2"
+      mcpHttpEnabled       = tostring(var.mcp_http_enabled)
+      mcpHttpPublicOrigin  = var.mcp_http_public_origin
+      mcpHttpWriteEnabled  = tostring(var.mcp_http_write_enabled)
     }
     databaseProxy = {
       enabled = true

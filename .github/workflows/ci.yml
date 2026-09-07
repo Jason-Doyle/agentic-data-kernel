@@ -58,6 +58,19 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-deployments.ps1
 
+  microsoft-integrations:
+    name: Microsoft agent integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: examples/microsoft-agent-framework/validation-requirements.txt
+      - run: python -m pip install --disable-pip-version-check --quiet -r examples/microsoft-agent-framework/validation-requirements.txt
+      - run: python scripts/validate-microsoft-integrations.py
+
   postgres:
     name: PostgreSQL integration
     runs-on: ubuntu-latest

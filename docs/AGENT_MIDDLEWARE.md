@@ -38,7 +38,7 @@ external-effect recovery.
 
 | Mode | Use when |
 | --- | --- |
-| Direct MCP | The model host already supports MCP and only needs kernel tools |
+| Direct MCP | The model host already supports MCP and only needs kernel tools over stdio or HTTPS |
 | Embedded middleware | A local or single-process agent uses the SQLite profile |
 | In-process production middleware | The agent runs beside a configured `ProductionKernel` |
 | HTTP production middleware | The agent host calls a separately deployed production API |
@@ -420,13 +420,18 @@ AGENTIC_DATA_INSTANCE_ID
 
 ## Direct MCP
 
-If the model host already supports MCP, it can use the existing embedded or
-production MCP process directly. MCP is the model-visible transport; the
-middleware API is the host-side lifecycle layer.
+If the model host already supports MCP, it can use the embedded or production
+stdio process, or the optional production Streamable HTTP endpoint at `/mcp`.
+MCP is the model-visible transport; the middleware API is the host-side
+lifecycle layer.
 
 Use direct MCP when the host already handles context assembly and durable turn
 recording. Use the middleware when those behaviors should be consistent across
 model vendors and agent frameworks.
+
+See the runnable
+[Microsoft Agent Framework](../examples/microsoft-agent-framework) and
+[Azure SRE Agent](../examples/azure-sre-agent) examples.
 
 ## External effects
 

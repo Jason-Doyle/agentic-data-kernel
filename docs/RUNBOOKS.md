@@ -9,6 +9,18 @@
    database.
 5. Check PostgreSQL connection limits and statement timeout logs.
 
+## Remote MCP connector is not ready
+
+1. Verify the API is ready and `MCP_HTTP_ENABLED=true`.
+2. Confirm the client URL is the configured public origin plus `/mcp`.
+3. Confirm the reverse proxy preserves the public `Host` header.
+4. Send both `Authorization: Bearer ...` and `X-Agent-Purpose`.
+5. Verify the key is active and includes `data:read`; add other scopes only
+   when remote write tools are deliberately enabled.
+6. Check the connector's MCP tool discovery and health logs. Remote MCP uses
+   stateless JSON responses, so clients must send authentication on every
+   request.
+
 ## Effect backlog or unknown outcome
 
 1. Keep the worker running with the same artifact keys and effect allowlist.

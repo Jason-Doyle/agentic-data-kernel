@@ -128,6 +128,43 @@ variable "effect_allowed_hosts" {
   default = ""
 }
 
+variable "mcp_http_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "mcp_http_public_origin" {
+  description = "Exact public HTTPS origin used for remote MCP Host and Origin validation."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = (
+      var.mcp_http_public_origin == "" ||
+      can(regex(
+        "^https://([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\\.([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/?$",
+        var.mcp_http_public_origin
+      ))
+    )
+    error_message = "mcp_http_public_origin must be an HTTPS DNS origin with an optional port from 1 through 65535."
+  }
+
+  validation {
+    condition     = !var.mcp_http_enabled || var.mcp_http_public_origin != ""
+    error_message = "mcp_http_public_origin is required when mcp_http_enabled is true."
+  }
+}
+
+variable "mcp_http_write_enabled" {
+  type    = bool
+  default = false
+
+  validation {
+    condition     = !var.mcp_http_write_enabled || var.mcp_http_enabled
+    error_message = "mcp_http_write_enabled requires mcp_http_enabled."
+  }
+}
+
 variable "api_replica_count" {
   type    = number
   default = 1

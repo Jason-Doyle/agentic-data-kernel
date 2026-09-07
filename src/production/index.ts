@@ -67,7 +67,16 @@ export {
 export { EncryptedArtifactStore } from "./artifacts.js";
 export { reconcileArtifactFiles } from "./artifact-reconciliation.js";
 export { ProductionKernel } from "./kernel.js";
-export { createProductionMcpServer } from "./mcp.js";
+export {
+  createProductionMcpServer,
+} from "./mcp.js";
+export type {
+  ProductionMcpServerOptions,
+} from "./mcp.js";
+export {
+  assertProductionMcpHttpRequestAllowed,
+  handleProductionMcpHttpRequest,
+} from "./mcp-http.js";
 export { startProductionHttpServer } from "./http.js";
 export { createProductionRuntime } from "./runtime.js";
 export { startWorkerMonitor } from "./worker-monitor.js";

@@ -253,6 +253,8 @@ function testConfig(
     shutdownTimeoutMs: 10_000,
     workerMonitorHost: "127.0.0.1",
     workerMonitorPort: 4319,
+    mcpHttpEnabled: false,
+    mcpHttpWriteEnabled: false,
   };
 }
 

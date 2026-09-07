@@ -12,6 +12,7 @@
 | HTTP | PostgreSQL | `POST /v1/execute` |
 | MCP | Development | `agentic-data-kernel mcp` |
 | MCP | PostgreSQL | `agentic-data-prod mcp` |
+| MCP | PostgreSQL remote | `POST /mcp` when explicitly enabled |
 | Agent middleware | Development | `createEmbeddedAgentMiddleware` |
 | Agent middleware | PostgreSQL in-process | `createProductionAgentMiddleware` |
 | Agent middleware | PostgreSQL HTTP | `createProductionHttpAgentMiddleware` |
@@ -333,9 +334,15 @@ GET  /health/ready
 GET  /metrics
 GET  /v1/catalog
 POST /v1/execute
+POST /mcp
 ```
 
-The production API does not expose SQL.
+The production API does not expose SQL. `/mcp` is disabled by default and
+requires a Bearer API key plus `X-Agent-Purpose` on every protocol request.
+Its default remote tool set is `search_knowledge`, `resolve_claims`,
+`get_machine`, `list_effects`, and `explain_trace`. Enabling
+`MCP_HTTP_WRITE_ENABLED` additionally exposes `execute_operation`; normal
+scope, purpose, tenant, budget, and workflow checks still apply.
 
 ## Errors
 

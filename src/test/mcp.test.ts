@@ -23,7 +23,15 @@ test("MCP exposes catalog and executes an intent", async () => {
   await client.connect(clientTransport);
 
   const tools = await client.listTools();
-  assert.ok(tools.tools.some((tool) => tool.name === "execute_intent"));
+  const executeIntentTool = tools.tools.find(
+    (tool) => tool.name === "execute_intent",
+  );
+  assert.ok(executeIntentTool);
+  const executeIntentSchema = JSON.stringify(
+    executeIntentTool.inputSchema,
+  );
+  assert.match(executeIntentSchema, /protocolVersion/);
+  assert.match(executeIntentSchema, /put_entity/);
   assert.ok(tools.tools.some((tool) => tool.name === "search_knowledge"));
   assert.ok(tools.tools.some((tool) => tool.name === "explain_trace"));
 

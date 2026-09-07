@@ -15,12 +15,16 @@
 | Boundary | Untrusted input | Enforcement |
 | --- | --- | --- |
 | HTTP edge | Headers, JSON, request size | Bearer authentication, purpose, scope, schema, rate limit |
-| MCP process | Tool arguments | Process-bound API key identity and operation schemas |
+| MCP stdio process | Tool arguments | Process-bound API key identity and operation schemas |
+| MCP HTTP edge | Host, Origin, headers, JSON-RPC, tool arguments | Explicit enablement, exact public origin, Bearer identity, purpose, rate limit, read-only default |
 | PostgreSQL | Application queries | Non-superuser role, forced RLS, tenant transaction context |
 | Artifact disk | Filesystem readers and corrupted bytes | AES-GCM, HKDF tenant key, content hash, strict paths |
 | Embedding provider | Remote response and availability | Timeout, schema validation, dimension validation, no fallback |
 | Effect receiver | DNS, HTTP response, ambiguous delivery | Host allowlist, public-address check, no redirect, idempotency key |
 | Backup media | Corruption or mismatched components | SHA-256 manifest and joint database/artifact recovery |
+
+Remote MCP rejects JSON-RPC batches so each accepted HTTP request contains at
+most one protocol message and consumes one rate-limit unit.
 
 ## Primary threats and controls
 
@@ -29,6 +33,14 @@
 The server ignores caller authority claims unless they exactly match the
 authenticated key. PostgreSQL RLS applies the verified tenant ID within every
 transaction.
+
+### Remote MCP rebinding or credential misuse
+
+Remote MCP is disabled by default and requires an exact configured public
+origin. The server rejects unexpected `Host` values and rejects supplied
+cross-origin requests before API-key authentication. Every request requires
+the Bearer API key and approved purpose; no cookie authentication is used.
+Write-capable `execute_operation` discovery is separately disabled by default.
 
 ### Stolen API key
 

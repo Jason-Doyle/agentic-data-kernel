@@ -34,6 +34,10 @@ The stable API consists of:
 
 Files or symbols not exported by the package entry points are internal.
 
+Remote Streamable HTTP MCP is an optional production route. It is disabled by
+default, uses stateless JSON responses, authenticates every request, and
+advertises read-only tools unless writes are explicitly enabled.
+
 Breaking changes to the stable API require a new major version. Additive
 operations, optional fields, and backwards-compatible deployment inputs may
 ship in a minor version. Fixes that preserve the contract ship in a patch

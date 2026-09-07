@@ -94,3 +94,8 @@ Do not update the image while leaving `services_enabled = true`.
 
 Secrets are referenced by ARN and are not created by this module. Do not pass
 secret values through `.tfvars`.
+
+Remote MCP shares the ALB-backed API at `/mcp`. Enable it with
+`mcp_http_enabled`, configure the exact HTTPS `mcp_http_public_origin`, and
+leave `mcp_http_write_enabled` false unless a narrowly scoped write identity
+and review boundary are in place.

@@ -14,9 +14,14 @@ import {
   PACKAGE_VERSION,
 } from "../version.js";
 
+export interface ProductionMcpServerOptions {
+  includeExecuteOperation?: boolean;
+}
+
 export function createProductionMcpServer(
   kernel: ProductionKernel,
   principal: AuthenticatedPrincipal,
+  options: ProductionMcpServerOptions = {},
 ): McpServer {
   const server = new McpServer({
     name: "agentic-data-kernel-production",
@@ -47,32 +52,34 @@ export function createProductionMcpServer(
       };
     },
   );
-  server.registerTool(
-    "execute_operation",
-    {
-      title: "Execute Authenticated Operation",
-      description:
-        "Execute one operation as the API key principal and receive a durable receipt.",
-      inputSchema: {
-        operation: agentOperationSchema,
-        idempotencyKey: z.string().trim().min(1).optional(),
+  if (options.includeExecuteOperation !== false) {
+    server.registerTool(
+      "execute_operation",
+      {
+        title: "Execute Authenticated Operation",
+        description:
+          "Execute one operation as the API key principal and receive a durable receipt.",
+        inputSchema: {
+          operation: agentOperationSchema,
+          idempotencyKey: z.string().trim().min(1).optional(),
+        },
       },
-    },
-    async ({ operation, idempotencyKey }) =>
-      toolResult(
-        await kernel.execute(principal, {
-          protocolVersion: AGENT_INTENT_VERSION,
-          requestId: randomUUID(),
-          ...(idempotencyKey ? { idempotencyKey } : {}),
-          principal: {
-            tenantId: principal.tenantId,
-            principalId: principal.principalId,
-            purpose: principal.purpose,
-          },
-          operation,
-        }),
-      ),
-  );
+      async ({ operation, idempotencyKey }) =>
+        toolResult(
+          await kernel.execute(principal, {
+            protocolVersion: AGENT_INTENT_VERSION,
+            requestId: randomUUID(),
+            ...(idempotencyKey ? { idempotencyKey } : {}),
+            principal: {
+              tenantId: principal.tenantId,
+              principalId: principal.principalId,
+              purpose: principal.purpose,
+            },
+            operation,
+          }),
+        ),
+    );
+  }
   server.registerTool(
     "search_knowledge",
     {
@@ -163,6 +170,29 @@ export function createProductionMcpServer(
     },
     async ({ instanceId }) =>
       toolResult(await kernel.getMachineReadOnly(principal, instanceId)),
+  );
+  server.registerTool(
+    "list_effects",
+    {
+      title: "List Durable Effects",
+      description:
+        "Read authenticated effect state with bounded cursor pagination.",
+      inputSchema: {
+        instanceId: z.string().trim().min(1).optional(),
+        afterEffectId: z.string().trim().min(1).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ instanceId, afterEffectId, limit }) =>
+      toolResult(
+        await kernel.listEffectsReadOnly(principal, {
+          op: "list_effects",
+          ...(instanceId ? { instanceId } : {}),
+          ...(afterEffectId ? { afterEffectId } : {}),
+          limit: limit ?? 100,
+        }),
+      ),
   );
   return server;
 }

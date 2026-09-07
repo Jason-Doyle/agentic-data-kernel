@@ -94,3 +94,18 @@ Helm stores ordinary values in release history. Do not place credentials in a
 values file or pass them with `--set`.
 Always set either `image.tag` to an immutable release version or
 `image.digest` to a `sha256:` OCI digest, never both.
+
+### Remote MCP
+
+The API can expose authenticated Streamable HTTP MCP at `/mcp`. It is disabled
+by default. Enable it only behind the chart's trusted HTTPS ingress:
+
+```powershell
+--set-string config.mcpHttpEnabled=true `
+--set-string config.mcpHttpPublicOrigin=https://agent-data.example.com `
+--set-string config.mcpHttpWriteEnabled=false
+```
+
+`mcpHttpPublicOrigin` must exactly match the public scheme and host seen by
+clients. The endpoint validates `Host` and any supplied `Origin` header.
+Keep write tools disabled for investigation-only agents.

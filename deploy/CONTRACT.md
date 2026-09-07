@@ -107,6 +107,9 @@ durability semantics.
 ## Networking
 
 - Expose only the API.
+- Remote MCP shares the API listener at `/mcp`; expose it only when
+  `MCP_HTTP_ENABLED=true` and `MCP_HTTP_PUBLIC_ORIGIN` exactly matches the
+  trusted public HTTPS origin.
 - Terminate TLS at the managed ingress or load balancer.
 - Set `TRUSTED_PROXY_HOPS` to the exact number of trusted forwarding hops and
   prevent direct access to the Node.js listener.
@@ -116,6 +119,7 @@ durability semantics.
   endpoint, and effect destinations. Standard Kubernetes NetworkPolicy cannot
   filter HTTPS by hostname.
 - Configure `EFFECT_ALLOWED_HOSTS` explicitly.
+- Keep `MCP_HTTP_WRITE_ENABLED=false` for read-only agent integrations.
 
 ## Health and rollout
 
