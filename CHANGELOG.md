@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0
+
 - Added authenticated, read-only-by-default Streamable HTTP MCP for remote
   agent hosts, with exact public-origin validation and per-request identity
   checks.

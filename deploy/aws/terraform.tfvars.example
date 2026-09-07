@@ -1,7 +1,7 @@
 # Copy this file, then uncomment and replace every example before deployment.
 # aws_region              = "us-east-2"
 # name_prefix             = "agentic-data"
-# image                   = "ghcr.io/jason-doyle/agentic-data-kernel:1.1.0"
+# image                   = "ghcr.io/jason-doyle/agentic-data-kernel:1.2.0"
 # ecs_cluster_arn         = "arn:aws:ecs:..."
 # private_subnet_ids      = ["subnet-...", "subnet-..."]
 # task_security_group_ids = ["sg-..."]
