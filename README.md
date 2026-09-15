@@ -1,6 +1,6 @@
 # Agentic Data Kernel
 
-> **Author note, 2 September 2026, Jason Doyle**
+> **Author note, 2 September 2026, [Jason Doyle](https://jasondoyle.ie/)**
 >
 > This project began as a feature forked from a private project and is now
 > maintained independently as open source. The documentation is heavily AI
@@ -11,6 +11,8 @@
 [![CodeQL](https://github.com/Jason-Doyle/agentic-data-kernel/actions/workflows/codeql.yml/badge.svg)](https://github.com/Jason-Doyle/agentic-data-kernel/actions/workflows/codeql.yml)
 [![npm](https://img.shields.io/npm/v/agentic-data-kernel?label=npm)](https://www.npmjs.com/package/agentic-data-kernel)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+Created and maintained by [Jason Doyle](https://jasondoyle.ie/).
 
 An agent-first persistence layer for durable knowledge, workflows, and
 controlled external effects.
