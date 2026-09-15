@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Agentic Data Kernel"
+type: software
+authors:
+  - family-names: "Doyle"
+    given-names: "Jason"
+    website: "https://jasondoyle.ie/"
+version: 1.2.0
+date-released: 2026-09-07
+repository-code: "https://github.com/Jason-Doyle/agentic-data-kernel"
+license: Apache-2.0

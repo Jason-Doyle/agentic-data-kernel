@@ -11,7 +11,10 @@
     "postgresql",
     "pgvector"
   ],
-  "author": "Jason Doyle",
+  "author": {
+    "name": "Jason Doyle",
+    "url": "https://jasondoyle.ie/"
+  },
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
