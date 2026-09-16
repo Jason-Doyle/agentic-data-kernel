@@ -117,7 +117,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@types/node": "^22.19.0",
+    "@types/node": "^26.5.1",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.0",
     "pgvector": "^0.3.0",
