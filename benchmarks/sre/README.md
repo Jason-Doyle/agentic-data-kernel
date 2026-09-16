@@ -34,8 +34,10 @@ Use `BENCHMARK_WRITE_RESULTS=1` to regenerate `results/summary.json` and
 
 `summary.json` includes every per-run outcome, audit answer, table count,
 database footprint, and informational duration used by the aggregate report.
-It also includes a portable source hash over the benchmark, production kernel,
-migrations, lockfile, and PostgreSQL container configuration.
+It also includes a portable source hash over benchmark-relevant package
+manifest fields, the lockfile, benchmark, production kernel, migrations, and
+PostgreSQL container configuration. Descriptive package metadata such as
+author and homepage does not invalidate the evidence.
 
 CI runs the comparison and verifies that the committed report is generated
 from `summary.json`, contains three correct runs per variant, has aggregates

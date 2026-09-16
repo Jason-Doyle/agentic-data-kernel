@@ -16,6 +16,7 @@ import {
   SyntheticRemediationTransport,
   type ProductionConfig,
 } from "../../src/production/index.js";
+import { stableStringify } from "../../src/util.js";
 import { runConventionalBaseline } from "./baseline.js";
 import { runKernelVariant } from "./kernel.js";
 import {
@@ -623,7 +624,6 @@ function listFiles(directory: string): string[] {
 
 function benchmarkSourceHash(): string {
   const paths = [
-    "package.json",
     "package-lock.json",
     "docker-compose.yml",
     ...listFiles("benchmarks/sre").filter((path) =>
@@ -637,17 +637,43 @@ function benchmarkSourceHash(): string {
         extname(path) === ".ts" &&
         !path.split(/[\\/]/).includes("test"),
     ),
-  ].map((path) => path.replaceAll("\\", "/")).sort();
+  ].map((path) => path.replaceAll("\\", "/"));
+  const inputs = [
+    {
+      path: "package.json",
+      source: benchmarkPackageManifest(),
+    },
+    ...paths.map((path) => ({
+      path,
+      source: normalizeLineEndings(readFileSync(resolve(path), "utf8")),
+    })),
+  ].sort((left, right) => left.path.localeCompare(right.path));
   const digest = createHash("sha256");
-  for (const path of paths) {
-    digest.update(path);
+  for (const input of inputs) {
+    digest.update(input.path);
     digest.update("\0");
-    digest.update(
-      normalizeLineEndings(readFileSync(resolve(path), "utf8")),
-    );
+    digest.update(input.source);
     digest.update("\0");
   }
   return digest.digest("hex");
+}
+
+function benchmarkPackageManifest(): string {
+  const manifest: unknown = JSON.parse(
+    readFileSync(resolve("package.json"), "utf8"),
+  );
+  if (!isRecord(manifest)) {
+    throw new Error("package.json must contain an object");
+  }
+  return stableStringify({
+    dependencies: manifest.dependencies,
+    devDependencies: manifest.devDependencies,
+    engines: manifest.engines,
+    overrides: manifest.overrides,
+    packageManager: manifest.packageManager,
+    scripts: manifest.scripts,
+    type: manifest.type,
+  });
 }
 
 function normalizeLineEndings(value: string): string {
