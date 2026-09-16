@@ -117,13 +117,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@types/node": "^26.5.1",
+    "@types/node": "^22.20.3",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.0",
     "pgvector": "^0.3.0",
     "pino": "^10.3.1",
-    "undici": "^8.10.1",
-    "zod": "^4.5.4"
+    "undici": "^8.10.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "ajv": "^8.20.0",
