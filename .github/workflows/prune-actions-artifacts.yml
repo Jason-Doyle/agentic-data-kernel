@@ -1,0 +1,222 @@
+name: Prune Actions artifacts
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report deletions without removing artifacts
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: prune-actions-artifacts
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RETENTION_DAYS: "5"
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Keep recent and latest successful artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.request
+          from collections import defaultdict
+          from datetime import datetime, timedelta, timezone
+
+
+          API = os.environ["GITHUB_API_URL"]
+          REPOSITORY = os.environ["GITHUB_REPOSITORY"]
+          TOKEN = os.environ["GH_TOKEN"]
+          RETENTION_DAYS = int(os.environ["RETENTION_DAYS"])
+          DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
+
+
+          def api(
+              method: str,
+              path: str,
+          ) -> dict[str, object] | list[object] | None:
+              for attempt in range(3):
+                  request = urllib.request.Request(
+                      API + path,
+                      headers={
+                          "Accept": "application/vnd.github+json",
+                          "Authorization": "Bearer " + TOKEN,
+                          "User-Agent": "artifact-retention-workflow",
+                          "X-GitHub-Api-Version": "2026-03-10",
+                      },
+                      method=method,
+                  )
+                  try:
+                      with urllib.request.urlopen(
+                          request,
+                          timeout=60,
+                      ) as response:
+                          body = response.read()
+                          return json.loads(body) if body else None
+                  except urllib.error.HTTPError as error:
+                      body = error.read().decode(
+                          "utf-8",
+                          errors="replace",
+                      )
+                      transient = (
+                          method == "GET"
+                          and error.code in {429, 500, 502, 503, 504}
+                      )
+                      if transient and attempt < 2:
+                          time.sleep(2 ** attempt)
+                          continue
+                      raise RuntimeError(
+                          f"{method} {path} returned HTTP "
+                          f"{error.code}: {body}"
+                      ) from error
+                  except urllib.error.URLError as error:
+                      if method == "GET" and attempt < 2:
+                          time.sleep(2 ** attempt)
+                          continue
+                      raise RuntimeError(
+                          f"{method} {path} failed: {error}"
+                      ) from error
+              raise RuntimeError(f"{method} {path} failed after retries")
+
+
+          def parse_time(value: str) -> datetime:
+              return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+          def stream_name(name: str) -> str:
+              if name.lower().endswith(".dockerbuild"):
+                  return "dockerbuild"
+              return name
+
+
+          artifacts: list[dict[str, object]] = []
+          page = 1
+          while True:
+              response = api(
+                  "GET",
+                  f"/repos/{REPOSITORY}/actions/artifacts"
+                  f"?per_page=100&page={page}",
+              )
+              raw_batch = response.get("artifacts", [])
+              batch = [
+                  item
+                  for item in raw_batch
+                  if not item.get("expired")
+              ]
+              artifacts.extend(batch)
+              if len(raw_batch) < 100:
+                  break
+              page += 1
+
+          cutoff = datetime.now(timezone.utc) - timedelta(
+              days=RETENTION_DAYS
+          )
+          keep_ids = {
+              int(artifact["id"])
+              for artifact in artifacts
+              if artifact.get("created_at")
+              and parse_time(str(artifact["created_at"])) >= cutoff
+          }
+
+          run_cache: dict[int, dict[str, object]] = {}
+          streams: dict[
+              tuple[int, str],
+              list[tuple[dict[str, object], dict[str, object]]],
+          ] = defaultdict(list)
+          for artifact in artifacts:
+              workflow_run = artifact.get("workflow_run") or {}
+              run_id = int(workflow_run.get("id") or 0)
+              if not run_id:
+                  raise RuntimeError(
+                      f"Artifact {artifact['id']} has no workflow run ID"
+                  )
+              if run_id not in run_cache:
+                  run_cache[run_id] = api(
+                      "GET",
+                      f"/repos/{REPOSITORY}/actions/runs/{run_id}",
+                  )
+              run = run_cache.get(run_id, {})
+              workflow_id = int(run.get("workflow_id") or 0)
+              if not workflow_id:
+                  raise RuntimeError(
+                      f"Workflow run {run_id} has no workflow ID"
+                  )
+              streams[
+                  (workflow_id, stream_name(str(artifact["name"])))
+              ].append((artifact, run))
+
+          for stream in streams.values():
+              successful = [
+                  item
+                  for item in stream
+                  if item[1].get("conclusion") == "success"
+              ]
+              if successful:
+                  latest = max(
+                      successful,
+                      key=lambda item: parse_time(
+                          str(item[0]["created_at"])
+                      ),
+                  )
+                  keep_ids.add(int(latest[0]["id"]))
+
+          deletions = [
+              artifact
+              for artifact in artifacts
+              if artifact.get("created_at")
+              and parse_time(str(artifact["created_at"])) < cutoff
+              and int(artifact["id"]) not in keep_ids
+          ]
+          deleted_bytes = 0
+          for artifact in sorted(
+              deletions,
+              key=lambda item: str(item["created_at"]),
+          ):
+              artifact_id = int(artifact["id"])
+              size = int(artifact.get("size_in_bytes") or 0)
+              action = "Would delete" if DRY_RUN else "Deleting"
+              print(
+                  f"{action} {artifact_id} {artifact['name']} "
+                  f"created={artifact['created_at']} bytes={size}"
+              )
+              if not DRY_RUN:
+                  api(
+                      "DELETE",
+                      f"/repos/{REPOSITORY}/actions/artifacts/{artifact_id}",
+                  )
+              deleted_bytes += size
+
+          summary = (
+              f"Artifacts scanned: {len(artifacts)}\n\n"
+              f"Artifacts retained: {len(artifacts) - len(deletions)}\n\n"
+              f"Artifacts {'eligible' if DRY_RUN else 'deleted'}: "
+              f"{len(deletions)}\n\n"
+              f"Bytes {'eligible' if DRY_RUN else 'reclaimed'}: "
+              f"{deleted_bytes}\n"
+          )
+          print(summary)
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as handle:
+                  handle.write("## Artifact retention\n\n" + summary)
+          PY
